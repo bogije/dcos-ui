@@ -27,16 +27,18 @@ const resolvers = {
     launched: (parent, args, ctx) => {
       const { name } = args;
 
-      if (name !== undefined) {
+      // act according with the type of filter
+      if (name === undefined) {
+        return ctx.query;
+      } else if (typeof name == "string") {
+        return ctx.query.map(els => els.filter(el => el.name === name));
+      } else {
         return ctx.query
           .combineLatest(name, (res, name) => [res, name])
           .map(els => els[0].filter(el => el.name === els[1]));
-      } else {
-        return ctx.query;
       }
     }
   }
-  // Mutation: {}
 };
 
 const schema = makeExecutableSchema({
@@ -75,7 +77,7 @@ describe("graphqlObservable", function() {
       m.expect(result.take(1)).toBeObservable(expected);
     });
 
-    itMarbles("filters by arguments", function(m) {
+    itMarbles("filters by variable argument", function(m) {
       const query = gql`
         query {
           launched(name: $nameFilter) {
@@ -93,6 +95,27 @@ describe("graphqlObservable", function() {
       const result = graphqlObservable(query, schema, {
         query: dataSource,
         nameFilter
+      });
+
+      m.expect(result.take(1)).toBeObservable(expected);
+    });
+
+    itMarbles("filters by static argument", function(m) {
+      const query = gql`
+        query {
+          launched(name: "discovery") {
+            name
+            firstFlight
+          }
+        }
+      `;
+
+      const expectedData = [{ name: "discovery" }, { name: "challenger" }];
+      const dataSource = Observable.of(expectedData);
+      const expected = m.cold("(a|)", { a: { launched: [expectedData[0]] } });
+
+      const result = graphqlObservable(query, schema, {
+        query: dataSource
       });
 
       m.expect(result.take(1)).toBeObservable(expected);

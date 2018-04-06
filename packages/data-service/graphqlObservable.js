@@ -3,7 +3,10 @@ import { Observable } from "rxjs/Observable";
 // TODO: refactor this once it has a more compreehensive implementation
 // of the graphql api
 
-/* eslint-disable import/prefer-default-export */
+// WARNING: This is NOT a spec complete graphql implementation
+// https://facebook.github.io/graphql/October2016/
+
+/* eslint-disable-next-line import/prefer-default-export */
 export const graphqlObservable = (doc, schema, context) => {
   const translateOperation = {
     query: "Query"
@@ -30,9 +33,15 @@ export const graphqlObservable = (doc, schema, context) => {
 
     // Node Field
     if (definition.kind === "Field" && definition.selectionSet !== undefined) {
-      const args = definition.arguments.reduce((args, arg) => {
-        return { [arg.name.value]: context[arg.value.name.value], ...args };
-      }, {});
+      const args = definition.arguments
+        .map(arg => {
+          if (arg.value.kind === "Variable") {
+            return { [arg.name.value]: context[arg.value.name.value] };
+          } else {
+            return { [arg.name.value]: arg.value.value };
+          }
+        })
+        .reduce(Object.assign, {});
 
       const resolvedObservable = typeMap[definition.name.value].resolve(
         parent,
@@ -81,4 +90,3 @@ export const graphqlObservable = (doc, schema, context) => {
     return acc.combineLatest(resolvedObservable, merger);
   }, Observable.of({}));
 };
-/* eslint-enable */
